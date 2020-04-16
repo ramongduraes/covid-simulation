@@ -70,11 +70,20 @@ class Simulation(object):
             for agent in filter(lambda x: x.social_stratum == quintil and x.age >= 18, self.population):
                 agent.wealth = share
 
-    def contact(self, agent1, agent2):
+    def contact(self, agent1, agent2, triggers=[]):
+        for trigger in triggers:
+            if trigger['condition'](agent1, agent2):
+                agent1.status = trigger['action'](agent1)
+                return
 
         if agent1.status == Status.Susceptible and agent2.status == Status.Infected:
-            teste_contagio = np.random.random()
-            if teste_contagio <= self.contagion_rate:
+            test_contagion = np.random.random()
+            if test_contagion <= self.contagion_rate:
+                # Marked for death test
+                indice = agent1.age // 10 - 1 if agent1.age > 10 else 0
+                death_test = np.random.random()
+                if age_death_probs[indice] > death_test:
+                    agent1.marked_for_death = True
                 agent1.status = Status.Infected
 
     def move(self, agent, triggers=[]):
@@ -118,23 +127,32 @@ class Simulation(object):
 
             teste_sub = np.random.random()
 
+            # Asymptomatic -> AsymptomaticSpreading
             if agent.infected_status == InfectionSeverity.Asymptomatic:
-                if age_hospitalization_probs[indice] > teste_sub:
+                if agent.infected_time > agent.asymptomatic_spreading_time:
+                    agent.infected_status = InfectionSeverity.AsymptomaticSpreading
+            # AsymptomaticSpreading -> SymptomaticSpreading
+            elif agent.infected_status == InfectionSeverity.AsymptomaticSpreading:
+                if agent.infected_time > agent.total_incubation_time:
+                    agent.infected_status = InfectionSeverity.SymptomaticSpreading
+            # SymptomaticSpreading -> Hospitalization
+            elif agent.infected_status == InfectionSeverity.SymptomaticSpreading:
+                if age_hospitalization_probs[indice] > teste_sub or agent.marked_for_death:
                     agent.infected_status = InfectionSeverity.Hospitalization
+            # Hospitalization -> Severe
             elif agent.infected_status == InfectionSeverity.Hospitalization:
-                if age_severe_probs[indice] > teste_sub:
+                if age_severe_probs[indice] > teste_sub or agent.marked_for_death:
                     agent.infected_status = InfectionSeverity.Severe
                     self.get_statistics()
                     if self.statistics['Severe'] + self.statistics['Hospitalization'] >= self.critical_limit:
                         agent.status = Status.Death
                         agent.infected_status = InfectionSeverity.Asymptomatic
-
-            death_test = np.random.random()
-            if age_death_probs[indice] > death_test:
+            # Severe -> Death for marked_for_death agents
+            elif agent.infected_status == InfectionSeverity.Severe and agent.marked_for_death:
                 agent.status = Status.Death
                 agent.infected_status = InfectionSeverity.Asymptomatic
-                return
 
+            # Recovered_Immune
             if agent.infected_time > 20:
                 agent.infected_time = 0
                 agent.status = Status.Recovered_Immune
@@ -144,7 +162,8 @@ class Simulation(object):
 
     def execute(self):
         mov_triggers = [k for k in self.triggers_population if k['attribute'] == 'move']
-        other_triggers = [k for k in self.triggers_population if k['attribute'] != 'move']
+        con_triggers = [k for k in self.triggers_population if k['attribute'] == 'contact']
+        other_triggers = [k for k in self.triggers_population if k['attribute'] != 'move' and k['attribute'] != 'contact']
 
         for agent in self.population:
             self.move(agent, triggers=mov_triggers)
@@ -170,8 +189,8 @@ class Simulation(object):
         for par in contacts:
             ai = self.population[par[0]]
             aj = self.population[par[1]]
-            self.contact(ai, aj)
-            self.contact(aj, ai)
+            self.contact(ai, aj, triggers=con_triggers)
+            self.contact(aj, ai, triggers=con_triggers)
 
         if len(self.triggers_simulation) > 0:
             for trigger in self.triggers_simulation:
