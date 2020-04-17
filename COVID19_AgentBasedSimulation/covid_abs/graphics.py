@@ -19,6 +19,10 @@ def color1(s):
         return 'gray'
     elif s == 'Recovered_Immune':
         return 'lightgreen'
+    elif s == 'AsymptomaticSpreading':
+        return 'yellow'
+    elif s == 'SymptomaticSpreading':
+        return 'gold'
     elif s == 'Death':
         return 'black'
     elif s == 'Hospitalization':
@@ -35,6 +39,10 @@ def color2(agent):
     elif agent.status == Status.Infected:
         if agent.infected_status == InfectionSeverity.Asymptomatic:
             return 'gray'
+        elif agent.infected_status == InfectionSeverity.AsymptomaticSpreading:
+            return 'yellow'
+        elif agent.infected_status == InfectionSeverity.SymptomaticSpreading:
+            return 'gold'
         elif agent.infected_status == InfectionSeverity.Hospitalization:
             return 'orange'
         else:

@@ -147,16 +147,17 @@ class Simulation(object):
                     if self.statistics['Severe'] + self.statistics['Hospitalization'] >= self.critical_limit:
                         agent.status = Status.Death
                         agent.infected_status = InfectionSeverity.Asymptomatic
-            # Severe -> Death for marked_for_death agents
-            elif agent.infected_status == InfectionSeverity.Severe and agent.marked_for_death:
-                agent.status = Status.Death
-                agent.infected_status = InfectionSeverity.Asymptomatic
 
             # Recovered_Immune
             if agent.infected_time > 20:
-                agent.infected_time = 0
-                agent.status = Status.Recovered_Immune
-                agent.infected_status = InfectionSeverity.Asymptomatic
+                # Severe -> Death for marked_for_death agents
+                if agent.infected_status == InfectionSeverity.Severe and agent.marked_for_death:
+                    agent.status = Status.Death
+                    agent.infected_status = InfectionSeverity.Asymptomatic
+                else:
+                    agent.infected_time = 0
+                    agent.status = Status.Recovered_Immune
+                    agent.infected_status = InfectionSeverity.Asymptomatic
 
         agent.wealth -= self.minimum_expense * basic_income[agent.social_stratum]
 
